@@ -5,6 +5,8 @@ services:
     # comment out if you want to externally connect DB
     # ports:
     #   - 5432:5432
+    networks:
+      - ee-global-backend-network
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
     environment:
@@ -21,6 +23,8 @@ services:
   skyvern:
     image: public.ecr.aws/skyvern/skyvern:latest
     restart: on-failure
+    networks:
+      - ee-global-backend-network
     # comment out if you want to externally call skyvern API
     ports:
       - 8000
@@ -83,6 +87,9 @@ services:
   skyvern-ui:
     image: public.ecr.aws/skyvern/skyvern-ui:latest
     restart: on-failure
+    networks:
+      - ee-global-backend-network
+      - ee-global-frontend-network
     ports:
       - 8080
       - 9090
@@ -92,16 +99,25 @@ services:
       - ./har:/data/har
       - ./.streamlit:/app/.streamlit
     environment:
+      - VIRTUAL_HOST=${VIRTUAL_HOST}
+      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
+      - VIRTUAL_PORT=8080
     # if you want to run skyvern on a remote server,
     # you need to change the host in VITE_WSS_BASE_URL and VITE_API_BASE_URL to match your server ip
     # If you're self-hosting this behind a dns, you'll want to set:
     #   A route for the API: api.yourdomain.com -> localhost:8000
     #   A route for the UI: yourdomain.com -> localhost:8080
     #   A route for the artifact API: artifact.yourdomain.com -> localhost:9090 (maybe not needed)
-      - VITE_WSS_BASE_URL=ws://localhost:8000/api/v1
-    #   - VITE_ARTIFACT_API_BASE_URL=http://localhost:9090
-    #   - VITE_API_BASE_URL=http://localhost:8000/api/v1
+      - VITE_WSS_BASE_URL=ws://skyvern-skyvern:8000/api/v1
+      - VITE_ARTIFACT_API_BASE_URL=http://skyvern-skyvern-ui:9090
+      - VITE_API_BASE_URL=http://skyvern-skyvern:8000/api/v1
     #   - VITE_SKYVERN_API_KEY=<get this from "settings" in the Skyvern UI>
     depends_on:
       skyvern:
         condition: service_healthy
+
+networks:
+  ee-global-frontend-network:
+    external: true
+  ee-global-backend-network:
+    external: true
