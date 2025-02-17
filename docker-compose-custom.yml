@@ -13,55 +13,42 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=skyvern
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d skyvern"]
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   skyvern:
     image: public.ecr.aws/skyvern/skyvern:latest
     networks:
       - ee-global-backend-network
       - ee-global-frontend-network
-    ports:
-      - "8000"
-    volumes:
-      - ./artifacts:/data/artifacts
-      - ./videos:/data/videos
-      - ./har:/data/har
-      - ./log:/data/log
-      - ./.streamlit:/app/.streamlit
     environment:
       - DATABASE_STRING=postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/skyvern
-      - BROWSER_TYPE=chromium-headful
       - VIRTUAL_HOST=${VIRTUAL_HOST}
       - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
-      # - VIRTUAL_PORT=8000
-      # Uncomment and configure your preferred LLM provider:
-      # - ENABLE_OPENAI=true
-      # - LLM_KEY=OPENAI_GPT4O
-      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - VIRTUAL_PORT=8000
+    volumes:
+      - skyvern-artifacts:/data/artifacts
+      - skyvern-videos:/data/videos
+      - skyvern-har:/data/har
+      - skyvern-log:/data/log
+      - streamlit-config:/.streamlit
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "test", "-f", "/app/.streamlit/secrets.toml"]
-      interval: 5s
-      timeout: 5s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
       retries: 5
+      start_period: 60s
 
   skyvern-ui:
     image: public.ecr.aws/skyvern/skyvern-ui:latest
     networks:
       - ee-global-frontend-network
-    ports:
-      - "8080"
-      - "9090"
-    volumes:
-      - ./artifacts:/data/artifacts
-      - ./videos:/data/videos
-      - ./har:/data/har
-      - ./.streamlit:/app/.streamlit
     environment:
       - VITE_API_BASE_URL=https://${VIRTUAL_HOST}/api/v1
       - VITE_WSS_BASE_URL=wss://${VIRTUAL_HOST}/api/v1
@@ -77,3 +64,8 @@ networks:
 
 volumes:
   postgres-data:
+  skyvern-artifacts:
+  skyvern-videos:
+  skyvern-har:
+  skyvern-log:
+  streamlit-config:
