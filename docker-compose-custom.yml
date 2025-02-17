@@ -75,9 +75,9 @@ services:
       # - AWS_REGION=us-west-2                         # Replace this with a different AWS region, if you desire
       # - AWS_ACCESS_KEY_ID=FILL_ME_IN_PLEASE
       # - AWS_SECRET_ACCESS_KEY=FILL_ME_IN_PLEASE
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
     healthcheck:
       test: ["CMD", "test", "-f", "/app/.streamlit/secrets.toml"]
       interval: 5s
@@ -112,9 +112,9 @@ services:
       - VITE_ARTIFACT_API_BASE_URL=http://skyvern-skyvern-ui:9090
       - VITE_API_BASE_URL=http://skyvern-skyvern:8000/api/v1
     #   - VITE_SKYVERN_API_KEY=<get this from "settings" in the Skyvern UI>
-    depends_on:
-      skyvern:
-        condition: service_healthy
+    # depends_on:
+    #   skyvern:
+    #     condition: service_healthy
 
 networks:
   ee-global-frontend-network:
