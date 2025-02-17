@@ -3,55 +3,79 @@ version: '3.8'
 services:
   postgres:
     image: postgres:14-alpine
+    restart: always
     networks:
       - ee-global-backend-network
+    # Uncomment if you want to externally connect to the DB:
+    # ports:
+    #   - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-data:/var/lib/postgresql/data
     environment:
       - PGDATA=/var/lib/postgresql/data/pgdata
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=skyvern
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d skyvern"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 5
 
   skyvern:
     image: public.ecr.aws/skyvern/skyvern:latest
+    restart: on-failure
     networks:
       - ee-global-backend-network
       - ee-global-frontend-network
+    # Expose the API externally:
+    ports:
+      - "8000"
+    volumes:
+      - ./artifacts:/data/artifacts
+      - ./videos:/data/videos
+      - ./har:/data/har
+      - ./log:/data/log
+      - ./.streamlit:/app/.streamlit
+      # Uncomment to connect to local changes:
+      # - ./skyvern:/app/skyvern
     environment:
       - DATABASE_STRING=postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/skyvern
+      - BROWSER_TYPE=chromium-headful
+      - ENABLE_OPENAI=true
+      - LLM_KEY=OPENAI_GPT4O
+      - OPENAI_API_KEY=
       - VIRTUAL_HOST=${VIRTUAL_HOST}
       - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
-      - VIRTUAL_PORT=8000
-    volumes:
-      - skyvern-artifacts:/data/artifacts
-      - skyvern-videos:/data/videos
-      - skyvern-har:/data/har
-      - skyvern-log:/data/log
-      - streamlit-config:/.streamlit
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "test", "-f", "/app/.streamlit/secrets.toml"]
+      interval: 5s
+      timeout: 5s
       retries: 5
-      start_period: 60s
 
   skyvern-ui:
     image: public.ecr.aws/skyvern/skyvern-ui:latest
+    restart: on-failure
     networks:
       - ee-global-frontend-network
+    # Expose the UI externally:
+    ports:
+      - "8080"
+      - "9090"
+    volumes:
+      - ./artifacts:/data/artifacts
+      - ./videos:/data/videos
+      - ./har:/data/har
+      - ./.streamlit:/app/.streamlit
     environment:
-      - VITE_API_BASE_URL=https://${VIRTUAL_HOST}/api/v1
-      - VITE_WSS_BASE_URL=wss://${VIRTUAL_HOST}/api/v1
+      - VITE_WSS_BASE_URL=ws://localhost:8000/api/v1
+      # Uncomment and adjust if needed:
+      # - VITE_ARTIFACT_API_BASE_URL=http://localhost:9090
+      # - VITE_API_BASE_URL=http://localhost:8000/api/v1
+      # - VITE_SKYVERN_API_KEY=
     depends_on:
       skyvern:
         condition: service_healthy
@@ -61,11 +85,3 @@ networks:
     external: true
   ee-global-backend-network:
     external: true
-
-volumes:
-  postgres-data:
-  skyvern-artifacts:
-  skyvern-videos:
-  skyvern-har:
-  skyvern-log:
-  streamlit-config:
